@@ -1,4 +1,4 @@
-```javascript
+javascript
 const express = require('express');
 const books = require('./booksdb.js');
 const auth_users = require('./auth_users.js');
@@ -9,23 +9,34 @@ const users = auth_users.users;
 
 const public_users = express.Router();
 
+
 /*
- * Register a new user.
- * Validates that username and password are provided
- * and prevents duplicate usernames.
+ * ============================================================
+ * USER REGISTRATION
+ * ============================================================
+ *
+ * Registers a new user after validating the username
+ * and password. Duplicate usernames are not allowed.
  */
 public_users.post('/register', (req, res) => {
     const username = req.body.username;
     const password = req.body.password;
 
-    if (!username || !password) {
+    // Validate that both required fields were provided.
+    if (
+        typeof username !== 'string' ||
+        typeof password !== 'string' ||
+        username.trim() === '' ||
+        password.trim() === ''
+    ) {
         return res.status(400).json({
             message: 'Username and password are required'
         });
     }
 
+    // Check whether the username is already registered.
     const userExists = users.some(
-        (user) => user.username === username
+        (user) => user.username === username.trim()
     );
 
     if (userExists) {
@@ -34,8 +45,9 @@ public_users.post('/register', (req, res) => {
         });
     }
 
+    // Store the new user.
     users.push({
-        username: username,
+        username: username.trim(),
         password: password
     });
 
@@ -46,22 +58,28 @@ public_users.post('/register', (req, res) => {
 
 
 /*
- * Task 10:
- * Get the complete list of books.
+ * ============================================================
+ * TASK 10 - GET ALL BOOKS
+ * ============================================================
  *
- * Axios is used together with async/await to perform
- * the asynchronous HTTP request.
+ * Uses async/await with Axios to retrieve the complete
+ * list of books from the API.
  */
 public_users.get('/', async function (req, res) {
     try {
+        // Axios performs the asynchronous HTTP request.
         const response = await axios.get(
             'http://localhost:3000/books'
         );
 
+        // Return the data received from the API.
         return res.status(200).json(response.data);
 
     } catch (error) {
-        // Consistent error response for Axios errors.
+        /*
+         * If Axios receives an HTTP error response,
+         * return the same status code and useful information.
+         */
         if (error.response) {
             return res.status(error.response.status).json({
                 message: 'Error fetching books',
@@ -69,6 +87,7 @@ public_users.get('/', async function (req, res) {
             });
         }
 
+        // Handle connection errors and unexpected errors.
         return res.status(500).json({
             message: 'Error fetching books',
             error: error.message
@@ -78,32 +97,58 @@ public_users.get('/', async function (req, res) {
 
 
 /*
- * Task 11:
- * Get a book by ISBN.
+ * ============================================================
+ * TASK 11 - GET BOOK BY ISBN
+ * ============================================================
  *
- * The ISBN parameter is validated before making
- * the Axios request.
+ * Retrieves a specific book using its ISBN.
+ * The ISBN is validated before making the request.
  */
 public_users.get('/isbn/:isbn', async function (req, res) {
     const isbn = req.params.isbn;
 
-    // Validate that an ISBN was provided.
-    if (!isbn || isbn.trim() === '') {
+    /*
+     * Validate that the ISBN exists and is not empty.
+     * trim() also prevents values containing only spaces.
+     */
+    if (
+        typeof isbn !== 'string' ||
+        isbn.trim() === ''
+    ) {
         return res.status(400).json({
-            message: 'ISBN is required'
+            message: 'ISBN is required and cannot be empty'
+        });
+    }
+
+    /*
+     * Validate the ISBN format.
+     * This accepts ISBN values containing digits and
+     * optional hyphens.
+     */
+    const isbnPattern = /^[0-9-]+$/;
+
+    if (!isbnPattern.test(isbn.trim())) {
+        return res.status(400).json({
+            message: 'Invalid ISBN format'
         });
     }
 
     try {
+        /*
+         * encodeURIComponent prevents special characters
+         * from breaking the request URL.
+         */
         const response = await axios.get(
-            `http://localhost:3000/isbn/${encodeURIComponent(isbn)}`
+            `http://localhost:3000/isbn/${encodeURIComponent(isbn.trim())}`
         );
 
         return res.status(200).json(response.data);
 
     } catch (error) {
-        // If the requested book does not exist,
-        // return the status received from the API.
+        /*
+         * Axios provides error.response when the server
+         * returned an HTTP error such as 404.
+         */
         if (error.response) {
             return res.status(error.response.status).json({
                 message: 'Error fetching book by ISBN',
@@ -111,6 +156,7 @@ public_users.get('/isbn/:isbn', async function (req, res) {
             });
         }
 
+        // Handle network and unexpected errors.
         return res.status(500).json({
             message: 'Error fetching book by ISBN',
             error: error.message
@@ -120,31 +166,45 @@ public_users.get('/isbn/:isbn', async function (req, res) {
 
 
 /*
- * Task 12:
- * Get all books written by a specific author.
+ * ============================================================
+ * TASK 12 - GET BOOKS BY AUTHOR
+ * ============================================================
  *
- * The author parameter is validated and encoded
- * before being included in the request URL.
+ * Retrieves all books written by the specified author.
+ * The author parameter is validated before the request.
  */
 public_users.get('/author/:author', async function (req, res) {
     const author = req.params.author;
 
-    // Validate the author parameter.
-    if (!author || author.trim() === '') {
+    /*
+     * Check that the author parameter exists,
+     * is a string and contains actual characters.
+     */
+    if (
+        typeof author !== 'string' ||
+        author.trim() === ''
+    ) {
         return res.status(400).json({
-            message: 'Author is required'
+            message: 'Author is required and cannot be empty'
         });
     }
 
     try {
+        /*
+         * encodeURIComponent allows author names containing
+         * spaces and special characters to be safely sent.
+         */
         const response = await axios.get(
-            `http://localhost:3000/author/${encodeURIComponent(author)}`
+            `http://localhost:3000/author/${encodeURIComponent(author.trim())}`
         );
 
         return res.status(200).json(response.data);
 
     } catch (error) {
-        // Handle HTTP errors returned by Axios.
+        /*
+         * Return the HTTP status received from the API
+         * when Axios receives an error response.
+         */
         if (error.response) {
             return res.status(error.response.status).json({
                 message: 'Error fetching books by author',
@@ -162,31 +222,43 @@ public_users.get('/author/:author', async function (req, res) {
 
 
 /*
- * Task 13:
- * Get all books with a specific title.
+ * ============================================================
+ * TASK 13 - GET BOOKS BY TITLE
+ * ============================================================
  *
- * The title parameter is validated and encoded
- * to safely use it in the request URL.
+ * Retrieves all books that match the specified title.
+ * The title parameter is validated before the request.
  */
 public_users.get('/title/:title', async function (req, res) {
     const title = req.params.title;
 
-    // Validate the title parameter.
-    if (!title || title.trim() === '') {
+    /*
+     * Validate that the title exists and is not empty.
+     */
+    if (
+        typeof title !== 'string' ||
+        title.trim() === ''
+    ) {
         return res.status(400).json({
-            message: 'Title is required'
+            message: 'Title is required and cannot be empty'
         });
     }
 
     try {
+        /*
+         * encodeURIComponent protects the URL when the title
+         * contains spaces, symbols or other special characters.
+         */
         const response = await axios.get(
-            `http://localhost:3000/title/${encodeURIComponent(title)}`
+            `http://localhost:3000/title/${encodeURIComponent(title.trim())}`
         );
 
         return res.status(200).json(response.data);
 
     } catch (error) {
-        // Handle HTTP errors returned by Axios.
+        /*
+         * Handle errors returned by the API consistently.
+         */
         if (error.response) {
             return res.status(error.response.status).json({
                 message: 'Error fetching books by title',
@@ -194,7 +266,7 @@ public_users.get('/title/:title', async function (req, res) {
             });
         }
 
-        // Handle connection or unexpected errors.
+        // Handle network and unexpected errors.
         return res.status(500).json({
             message: 'Error fetching books by title',
             error: error.message
@@ -204,33 +276,55 @@ public_users.get('/title/:title', async function (req, res) {
 
 
 /*
- * Get reviews for a specific book using its ISBN.
+ * ============================================================
+ * GET BOOK REVIEWS
+ * ============================================================
  *
- * This endpoint uses the local books database because
- * the reviews are already stored in booksdb.js.
+ * Returns the reviews associated with a specific ISBN.
  */
 public_users.get('/review/:isbn', function (req, res) {
     const isbn = req.params.isbn;
 
-    // Validate ISBN before accessing the database.
-    if (!isbn || isbn.trim() === '') {
+    // Validate the ISBN parameter.
+    if (
+        typeof isbn !== 'string' ||
+        isbn.trim() === ''
+    ) {
         return res.status(400).json({
-            message: 'ISBN is required'
+            message: 'ISBN is required and cannot be empty'
         });
     }
 
-    // Check whether the requested book exists.
-    if (!books[isbn]) {
+    // Validate the ISBN format.
+    const isbnPattern = /^[0-9-]+$/;
+
+    if (!isbnPattern.test(isbn.trim())) {
+        return res.status(400).json({
+            message: 'Invalid ISBN format'
+        });
+    }
+
+    /*
+     * Check whether the requested book exists
+     * in the local books database.
+     */
+    if (!books[isbn.trim()]) {
         return res.status(404).json({
             message: 'Book not found'
         });
     }
 
+    // Return the reviews associated with the book.
     return res.status(200).json(
-        books[isbn].reviews
+        books[isbn.trim()].reviews
     );
 });
 
 
+/*
+ * Export the router so it can be used by the main
+ * Express application.
+ */
 module.exports.general = public_users;
 ```
+
